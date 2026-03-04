@@ -19,24 +19,14 @@ class Activite extends Model implements HasMedia
         'titre',
         'slug',
         'description',
-        'section',
         'date_activite',
         'publie',
     ];
 
     protected $casts = [
-    'publie' => 'boolean',
-];
-
-    protected function casts(): array
-    {
-        return [
-            'date_activite' => 'date',
-            'publie' => 'boolean',
-        ];
-    }
-
-    const SECTIONS = ['creche', 'ps', 'ms', 'gs', 'toutes'];
+        'date_activite' => 'date',
+        'publie' => 'boolean',
+    ];
 
     public function auteur(): BelongsTo
     {
