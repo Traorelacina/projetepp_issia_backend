@@ -11,11 +11,11 @@ class ActiviteController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Activite::with(['auteur:id,name'])->withCount('media')->orderByDesc('date_activite');
+        $query = Activite::with(['auteur:id,name'])
+                        ->withCount('media')
+                        ->orderByDesc('date_activite');
 
-        if ($request->has('section')) {
-            $query->where('section', $request->section);
-        }
+        // Filtre par statut de publication uniquement
         if ($request->has('publie')) {
             $query->where('publie', $request->boolean('publie'));
         }
@@ -28,13 +28,15 @@ class ActiviteController extends Controller
         $validated = $request->validate([
             'titre' => 'required|string|max:255',
             'description' => 'required|string',
-            'section' => 'required|in:creche,ps,ms,gs,toutes',
             'date_activite' => 'required|date',
             'publie' => 'boolean',
         ]);
 
         $activite = Activite::create([
-            ...$validated,
+            'titre' => $validated['titre'],
+            'description' => $validated['description'],
+            'date_activite' => $validated['date_activite'],
+            'publie' => $validated['publie'] ?? false,
             'user_id' => $request->user()->id,
             'slug' => Activite::genererSlug($validated['titre']),
         ]);
@@ -66,12 +68,30 @@ class ActiviteController extends Controller
         $validated = $request->validate([
             'titre' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
-            'section' => 'sometimes|in:creche,ps,ms,gs,toutes',
             'date_activite' => 'sometimes|date',
             'publie' => 'sometimes|boolean',
         ]);
 
-        $activite->update($validated);
+        $dataToUpdate = [];
+
+        if (isset($validated['titre'])) {
+            $dataToUpdate['titre'] = $validated['titre'];
+            $dataToUpdate['slug'] = Activite::genererSlug($validated['titre']);
+        }
+
+        if (isset($validated['description'])) {
+            $dataToUpdate['description'] = $validated['description'];
+        }
+
+        if (isset($validated['date_activite'])) {
+            $dataToUpdate['date_activite'] = $validated['date_activite'];
+        }
+
+        if (isset($validated['publie'])) {
+            $dataToUpdate['publie'] = $validated['publie'];
+        }
+
+        $activite->update($dataToUpdate);
 
         if ($request->hasFile('photos')) {
             foreach ($request->file('photos') as $photo) {
