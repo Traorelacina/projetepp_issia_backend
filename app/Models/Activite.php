@@ -50,15 +50,9 @@ class Activite extends Model implements HasMedia
 
     public function registerMediaConversions(?Media $media = null): void
     {
-        $this->addMediaConversion('thumb')
-             ->width(400)
-             ->height(300)
-             ->performOnCollections('photos');
-
-        $this->addMediaConversion('medium')
-             ->width(800)
-             ->height(600)
-             ->performOnCollections('photos');
+        // CONVERSIONS SUPPRIMÉES - plus de traitement d'image requis
+        // Cette méthode est laissée vide pour éviter les erreurs GD
+        // Les images seront stockées sans redimensionnement
     }
 
     public function scopePubliees($query)
