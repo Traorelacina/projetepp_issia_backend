@@ -30,11 +30,11 @@ class ActiviteController extends Controller
             $activites->through(function ($a) {
                 try {
                     $firstMedia = $a->getFirstMedia('photos');
+                    // Utiliser getUrl() SANS paramètre (pas de 'thumb')
                     $a->photo_couverture = $firstMedia 
-                        ? $firstMedia->getUrl() // URL originale sans 'thumb'
+                        ? $firstMedia->getUrl() 
                         : null;
                     
-                    // Compter le nombre de photos
                     $a->photos_count = $a->getMedia('photos')->count();
                     
                 } catch (\Exception $e) {
