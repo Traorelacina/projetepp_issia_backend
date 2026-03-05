@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 
 class ActiviteController extends Controller
 {
@@ -15,22 +16,20 @@ class ActiviteController extends Controller
     {
         try {
             $query = Activite::with(['auteur:id,name'])
-                            ->withCount('media')
-                            ->orderByDesc('date_activite');
+                ->withCount('media')
+                ->orderByDesc('date_activite');
 
             if ($request->has('publie')) {
                 $query->where('publie', $request->boolean('publie'));
             }
 
-            return response()->json([
-                'success' => true, 
-                'data' => $query->paginate(20)
-            ]);
+            return response()->json(['success' => true, 'data' => $query->paginate(20)]);
+
         } catch (\Exception $e) {
-            \Log::error('Erreur index activites: ' . $e->getMessage());
+            Log::error('Erreur index activites: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du chargement des activités'
+                'message' => 'Erreur lors du chargement des activités',
             ], 500);
         }
     }
@@ -39,22 +38,21 @@ class ActiviteController extends Controller
     {
         try {
             $validated = $request->validate([
-                'titre' => 'required|string|max:255',
-                'description' => 'required|string',
+                'titre'         => 'required|string|max:255',
+                'description'   => 'required|string',
                 'date_activite' => 'required|date',
-                'publie' => 'sometimes|boolean',
+                'publie'        => 'sometimes|boolean',
             ]);
 
             $activite = Activite::create([
-                'titre' => $validated['titre'],
-                'description' => $validated['description'],
+                'titre'         => $validated['titre'],
+                'description'   => $validated['description'],
                 'date_activite' => $validated['date_activite'],
-                'publie' => $validated['publie'] ?? false,
-                'user_id' => $request->user()->id,
-                'slug' => Activite::genererSlug($validated['titre']),
+                'publie'        => $validated['publie'] ?? false,
+                'user_id'       => $request->user()->id,
+                'slug'          => Activite::genererSlug($validated['titre']),
             ]);
 
-            // Upload des médias si fournis
             if ($request->hasFile('photos')) {
                 foreach ($request->file('photos') as $photo) {
                     if ($photo->isValid()) {
@@ -66,22 +64,21 @@ class ActiviteController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Activité créée avec succès.',
-                'data' => $activite->load('auteur:id,name'),
+                'data'    => $this->formatActivite($activite),
             ], 201);
 
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur de validation',
-                'errors' => $e->errors()
+                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Erreur création activité: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-            
+            Log::error('Erreur création activité: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création: ' . $e->getMessage()
+                'message' => 'Erreur lors de la création: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -91,13 +88,13 @@ class ActiviteController extends Controller
         try {
             return response()->json([
                 'success' => true,
-                'data' => $activite->load('auteur:id,name')->load('media'),
+                'data'    => $this->formatActivite($activite),
             ]);
         } catch (\Exception $e) {
-            \Log::error('Erreur affichage activité: ' . $e->getMessage());
+            Log::error('Erreur affichage activité: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du chargement de l\'activité'
+                'message' => 'Erreur lors du chargement de l\'activité',
             ], 500);
         }
     }
@@ -105,77 +102,44 @@ class ActiviteController extends Controller
     public function update(Request $request, Activite $activite): JsonResponse
     {
         try {
-            // Log des données reçues pour débogage
-            \Log::info('Données reçues pour mise à jour:', [
-                'all' => $request->all(),
-                'files' => $request->hasFile('photos') ? count($request->file('photos')) : 0,
-                'method' => $request->method(),
-                'content_type' => $request->header('Content-Type')
+            Log::info('Données reçues pour mise à jour:', [
+                'all'          => $request->except(['photos']),
+                'photos_count' => $request->hasFile('photos') ? count($request->file('photos')) : 0,
+                'method'       => $request->method(),
             ]);
-
-            // Gérer à la fois PUT, POST et POST avec _method
-            $rules = [
-                'titre' => 'sometimes|string|max:255',
-                'description' => 'sometimes|string',
-                'date_activite' => 'sometimes|date',
-                'publie' => 'sometimes|boolean',
-            ];
-
-            // Validation personnalisée pour gérer les différents formats
-            $validated = [];
-            
-            if ($request->has('titre')) {
-                $validated['titre'] = $request->input('titre');
-            }
-            
-            if ($request->has('description')) {
-                $validated['description'] = $request->input('description');
-            }
-            
-            if ($request->has('date_activite')) {
-                $validated['date_activite'] = $request->input('date_activite');
-            }
-            
-            if ($request->has('publie')) {
-                // Gérer à la fois string '1'/'0' et boolean true/false
-                $publie = $request->input('publie');
-                if (is_string($publie)) {
-                    $validated['publie'] = $publie === '1' || $publie === 'true';
-                } else {
-                    $validated['publie'] = (bool) $publie;
-                }
-            }
 
             $dataToUpdate = [];
 
-            if (isset($validated['titre'])) {
-                $dataToUpdate['titre'] = $validated['titre'];
-                $dataToUpdate['slug'] = Activite::genererSlug($validated['titre']);
+            if ($request->has('titre')) {
+                $dataToUpdate['titre'] = $request->input('titre');
+                $dataToUpdate['slug']  = Activite::genererSlug($request->input('titre'));
             }
 
-            if (isset($validated['description'])) {
-                $dataToUpdate['description'] = $validated['description'];
+            if ($request->has('description')) {
+                $dataToUpdate['description'] = $request->input('description');
             }
 
-            if (isset($validated['date_activite'])) {
-                $dataToUpdate['date_activite'] = $validated['date_activite'];
+            if ($request->has('date_activite')) {
+                $dataToUpdate['date_activite'] = $request->input('date_activite');
             }
 
-            if (isset($validated['publie'])) {
-                $dataToUpdate['publie'] = $validated['publie'];
+            if ($request->has('publie')) {
+                $publie = $request->input('publie');
+                $dataToUpdate['publie'] = is_string($publie)
+                    ? in_array($publie, ['1', 'true'])
+                    : (bool) $publie;
             }
 
             if (!empty($dataToUpdate)) {
                 $activite->update($dataToUpdate);
-                \Log::info('Activité mise à jour avec:', $dataToUpdate);
+                Log::info('Activité mise à jour avec:', $dataToUpdate);
             }
 
-            // Upload des nouvelles photos
             if ($request->hasFile('photos')) {
                 foreach ($request->file('photos') as $photo) {
                     if ($photo->isValid()) {
                         $activite->addMedia($photo)->toMediaCollection('photos');
-                        \Log::info('Photo ajoutée: ' . $photo->getClientOriginalName());
+                        Log::info('Photo ajoutée: ' . $photo->getClientOriginalName());
                     }
                 }
             }
@@ -183,28 +147,23 @@ class ActiviteController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Activité mise à jour avec succès.',
-                'data' => $activite->load('auteur:id,name')->load('media'),
+                'data'    => $this->formatActivite($activite),
             ]);
 
         } catch (ValidationException $e) {
-            \Log::warning('Erreur validation update: ' . json_encode($e->errors()));
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur de validation',
-                'errors' => $e->errors()
+                'errors'  => $e->errors(),
             ], 422);
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Activité non trouvée'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Activité non trouvée'], 404);
         } catch (\Exception $e) {
-            \Log::error('Erreur mise à jour activité: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-            
+            Log::error('Erreur mise à jour activité: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur: ' . $e->getMessage()
+                'message' => 'Erreur serveur: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -216,16 +175,60 @@ class ActiviteController extends Controller
             $activite->clearMediaCollection('videos');
             $activite->delete();
 
-            return response()->json([
-                'success' => true, 
-                'message' => 'Activité supprimée avec succès.'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Activité supprimée avec succès.']);
+
         } catch (\Exception $e) {
-            \Log::error('Erreur suppression activité: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la suppression'
-            ], 500);
+            Log::error('Erreur suppression activité: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erreur lors de la suppression'], 500);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Charge l'auteur + TOUTES les photos normalisées.
+    // Utilisé par store / show / update pour une réponse cohérente.
+    // ─────────────────────────────────────────────────────────────
+    private function formatActivite(Activite $activite): array
+    {
+        // Recharge depuis la BDD pour avoir les médias fraîchement uploadés
+        $activite->load(['auteur:id,name', 'media']);
+
+        $mediaItems = $activite->getMedia('photos');
+
+        // Normalise chaque photo avec les champs attendus par ActiviteDetail.jsx
+        $photos = $mediaItems->map(fn ($m) => [
+            'id'               => $m->id,
+            'original_url'     => $m->getUrl(),
+            'preview_url'      => $m->getUrl(),
+            'conversions_urls' => [
+                'thumb'  => $this->safeConversionUrl($m, 'thumb'),
+                'medium' => $this->safeConversionUrl($m, 'medium'),
+            ],
+            'name'             => $m->file_name,
+            'mime_type'        => $m->mime_type,
+            'size'             => $m->size,
+        ])->values()->toArray();
+
+        $firstMedia = $mediaItems->first();
+
+        return array_merge($activite->toArray(), [
+            'photos'          => $photos,
+            'photos_count'    => $mediaItems->count(),
+            'photo_couverture' => $firstMedia
+                ? ($this->safeConversionUrl($firstMedia, 'medium') ?: $firstMedia->getUrl())
+                : null,
+            // On retire 'media' (objets Spatie bruts) pour éviter la confusion
+            // côté frontend entre act.media et act.photos
+            'media'           => null,
+        ]);
+    }
+
+    private function safeConversionUrl($media, string $conversion): ?string
+    {
+        if (!$media) return null;
+        try {
+            return $media->getUrl($conversion) ?: $media->getUrl();
+        } catch (\Exception $e) {
+            return $media->getUrl();
         }
     }
 }
