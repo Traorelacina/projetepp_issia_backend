@@ -101,4 +101,9 @@ Route::prefix('admin')->middleware(['auth:sanctum'])->group(function () {
     // === PARAMÈTRES ===
     Route::get('/parametres', [ParametreController::class, 'adminIndex']);
     Route::put('/parametres/{cle}', [ParametreController::class, 'update']);
+    
+    // ROUTE SPÉCIALE POUR LA PHOTO DU DIRECTEUR
+    Route::post('/parametres/photo-directeur', [ParametreController::class, 'uploadPhotoDirecteur']);
+    // Route alternative si votre frontend utilise le pattern existant
+    Route::post('/parametres/photo_directeur', [ParametreController::class, 'uploadPhotoDirecteur']);
 });
