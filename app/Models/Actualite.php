@@ -12,7 +12,6 @@ class Actualite extends Model
 
     protected $fillable = [
         'user_id',
-        'titre',
         'contenu',
         'type',
         'statut',
