@@ -23,7 +23,7 @@ class ActualiteController extends Controller
         }
 
         if ($request->has('search')) {
-            $query->where('titre', 'like', "%{$request->search}%");
+            $query->where('contenu', 'like', "%{$request->search}%");
         }
 
         $actualites = $query->paginate($request->get('per_page', 20));
@@ -36,7 +36,6 @@ class ActualiteController extends Controller
         $this->authorize('create-actualite');
 
         $validated = $request->validate([
-            'titre' => 'required|string|max:255',
             'contenu' => 'required|string',
             'type' => 'required|in:flash,convocation,evenement,inscription',
             'statut' => 'required|in:brouillon,publie,planifie',
@@ -72,7 +71,6 @@ class ActualiteController extends Controller
         $this->authorize('edit-actualite');
 
         $validated = $request->validate([
-            'titre' => 'sometimes|string|max:255',
             'contenu' => 'sometimes|string',
             'type' => 'sometimes|in:flash,convocation,evenement,inscription',
             'statut' => 'sometimes|in:brouillon,publie,planifie,archive',
