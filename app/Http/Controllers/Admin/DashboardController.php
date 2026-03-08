@@ -39,10 +39,10 @@ class DashboardController extends Controller
             ->limit(5)
             ->get(['id', 'user_id', 'contenu', 'type', 'statut', 'date_publication', 'created_at']);
 
-        // Dernières activités - SANS la colonne 'section' qui n'existe pas
+        // Dernières activités - AVEC LES BONNES COLONNES de la table
         $dernieres_activites = Activite::orderByDesc('created_at')
             ->limit(5)
-            ->get(['id', 'titre', 'slug', 'photo_principale', 'created_at']);
+            ->get(['id', 'titre', 'slug', 'date_activite', 'publie', 'created_at']);
 
         return response()->json([
             'success' => true,
